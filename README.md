@@ -125,22 +125,31 @@ Moving to origin isolation requires some observable changes, and thus the opt-in
 
 The specification for this feature in itself is fairly small. Most of the work is done by the foundational mechanisms of [origin policy](https://github.com/WICG/origin-policy) and the HTML Standard's [agent cluster map](https://html.spec.whatwg.org/#agent-cluster-map).
 
-In particular, when creating a document or worker, we use the following algorithm:
+In particular, when creating a document or worker, we use the following in place of the current algorithm for [obtain an agent cluster key](https://html.spec.whatwg.org/#obtain-agent-cluster-key). It takes as input an _origin_ of the realm to be created, _requestsIsolation_ (a boolean, derived from the `"isolation"` key in the origin policy manifest), and a browsing context group _group_. It outputs the [agent cluster key](https://html.spec.whatwg.org/#agent-cluster-key) to be used, which will be either a site or an origin.
 
-1. If an agent cluster keyed by the origin in question exists, use that agent cluster.
-    * Example: `https://example.com/` was loaded with origin isolation, and embeds an iframe for `https://example.com/` which loads with origin isolation.
-    * Example: `https://example.com/` was loaded with origin isolation, but embeds an iframe for `https://example.com/` which loads without origin isolation. In this case the iframe will still be origin-isolated; once a given browsing context group has `https://example.com/` in its list of isolated origins (i.e., its agent cluster map keys), there is no going back for that browsing context group.
-1. Otherwise, if an agent cluster keyed by the site in question exists, use that agent cluster.
-    * Example: `https://example.com/` was loaded without origin isolation, and embeds an iframe for `https://example.com/` which also loads without origin isolation.
-    * Example: `https://example.com/` was loaded without origin isolation, but embeds an iframe for `https://example.com/` which loads with origin isolation. In this case the iframe will not be origin-isolated, even though it was requested, because we don't want to separate it from the existing site-keyed documents.
-1. If no such agent clusters exist, and the origin policy contains an `"isolation"` member, then create a new agent cluster keyed by origin, and use it.
-    * Example: a new tab is created which loads `https://example.com/`, whose origin policy specifies origin isolation.
-1. Otherwise, create a new agent cluster keyed by site.
-    * Example: a new tab is created which loads `https://example.com/`, whose origin policy does not specify origin isolation.
+1. If _origin_ is an [opaque origin](https://html.spec.whatwg.org/#concept-origin-opaque), then return _origin_.
+1. If _origin_'s [host](https://html.spec.whatwg.org/#concept-origin-host)'s [registrable domain](https://url.spec.whatwg.org/#host-registrable-domain) is null, then return _origin_.
+1. If _group_'s [agent cluster map](https://html.spec.whatwg.org/#agent-cluster-map)\[_origin_] exists, then return _origin_.
+1. Let _site_ be (_origin_'s [scheme](https://html.spec.whatwg.org/#concept-origin-scheme), _origin_'s [host](https://html.spec.whatwg.org/#concept-origin-host)'s [registrable domain](https://url.spec.whatwg.org/#host-registrable-domain)).
+1. If _requestsIsolation_ is true:
+    1. If _group_'s [agent cluster map](https://html.spec.whatwg.org/#agent-cluster-map)\[_site_] exists, and _group_'s [agent cluster map](https://html.spec.whatwg.org/#agent-cluster-map)\[_site_] contains any agents which contain any realms whose [settings object](https://html.spec.whatwg.org/#concept-realm-settings-object)'s [origin](https://html.spec.whatwg.org/#concept-settings-object-origin) are [same-origin](https://html.spec.whatwg.org/#same-origin) with _origin_, then return _site_.
+    1. Return _origin_.
+1. Return _site_.
 
-This will automatically cause `SharedArrayBuffer`s to no longer be shareable cross-origin, because of the agent cluster check in [StructuredDeserialize](https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserialize). We'd also need to add a check to the [`document.domain` setter](https://html.spec.whatwg.org/multipage/origin.html#dom-document-domain) to make it throw. (Ideally we'd find some way of restructuring the existing checks in `document.domain` so that they are also tied to agent cluster boundaries.)
+This algorithm has two interesting features:
+
+* Even if origin isolation is not requested for a particular document/worker creation, if origin isolation has previously created an origin-keyed agent cluster, then we put the new document/worker in that origin-keyed agent cluster.
+* Even when origin isolation is requested, if there is a site-keyed agent cluster with same-origin realms, then we put the new document/worker in that site-keyed agent cluster, ignoring the isolation request.
+
+Both of these are consequences of a desire to ensure that same-origin sites do not end up isolated from each other.
+
+You can see a more full analysis of what results this algorithm produces in our [scenarios document](./scenarios.md).
+
+As far as the consequences of using origins for agent cluster keys, this will automatically cause `SharedArrayBuffer`s to no longer be shareable cross-origin, because of the agent cluster check in [StructuredDeserialize](https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserialize). We'd also need to add a check to the [`document.domain` setter](https://html.spec.whatwg.org/multipage/origin.html#dom-document-domain) to make it throw. (Ideally we'd find some way of restructuring the existing checks in `document.domain` so that they are also tied to agent cluster boundaries.)
 
 ### More complicated example
+
+TODO: move this to scenarios.md?
 
 Consider the following scenario:
 
