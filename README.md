@@ -20,7 +20,6 @@ This proposal allows web applications to give up these capabilities for their or
 - [How it works](#how-it-works)
   - [Background: agent clusters](#background-agent-clusters)
   - [Specification plan](#specification-plan)
-  - [More complicated example](#more-complicated-example)
 - [Design choices and alternatives considered](#design-choices-and-alternatives-considered)
   - [Origin policy](#origin-policy)
   - [The browsing context group scope of isolation](#the-browsing-context-group-scope-of-isolation)
@@ -145,39 +144,7 @@ Both of these are consequences of a desire to ensure that same-origin sites do n
 
 You can see a more full analysis of what results this algorithm produces in our [scenarios document](./scenarios.md).
 
-As far as the consequences of using origins for agent cluster keys, this will automatically cause `SharedArrayBuffer`s to no longer be shareable cross-origin, because of the agent cluster check in [StructuredDeserialize](https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserialize). We'd also need to add a check to the [`document.domain` setter](https://html.spec.whatwg.org/multipage/origin.html#dom-document-domain) to make it throw. (Ideally we'd find some way of restructuring the existing checks in `document.domain` so that they are also tied to agent cluster boundaries.)
-
-### More complicated example
-
-TODO: move this to scenarios.md?
-
-Consider the following scenario:
-
-* `https://example.org/` embeds an iframe for `https://a.example.com/` which embeds an iframe for `https://b.example.com/1`
-* We open tab #1 to `https://example.org/`. Both `https://a.example.com/` and `https://b.example.com/1` responses point to origin policies with `"isolation": true` set.
-
-(To simplify this example, assume at all times that we use "blocking" origin policies, i.e. no [async updates](https://github.com/WICG/origin-policy/issues/10) are involved.)
-
-Now, things get fun:
-
-* While we have tab #1 open, the server operator updates both `https://a.example.com/.well-known/origin-policy` and `https://b.example.com/.well-known/origin-policy` to set `"isolation": false`.
-* Then, in tab #1, `https://a.example.com/` inserts a new iframe, pointing to `https://b.example.com/2`. Since the `https://b.example.com/` policy on the server has been updated, the response used for creating this second child iframe is no longer requesting origin isolation.
-* This `https://b.example.com/2` iframe inserts an iframe for `https://c.example.com/`, which has no origin policy. Then `https://b.example.com/2` tries to `postMessage()` a `SharedArrayBuffer` to `https://c.example.com/`.
-
-What happens?
-
-The answer that the above specification plan gives is that the `postMessage()` fails. Within the browsing context group (i.e. tab #1), `https://b.example.com/` is in the list of isolated origins, so even though the `https://b.example.com/2` iframe was loaded with an origin policy saying `"isolation": false`, it still gets origin-isolated.
-
-OK, let's go further.
-
-* Now we open up a new tab to `https://example.org/`, tab #2. Because of the server update, the origin policies corresponding to the nested iframes for `https://a.example.com/` and `https://b.example.com/1` have `"isolation": false` set.
-* The `https://a.example.com/` iframe tries to `postMessage()` a `SharedArrayBuffer` to the `https://b.example.com/1` iframe.
-
-What happens this time?
-
-This time, we are in a new browsing context group, with a new agent cluster map. So this time, the iframes are not origin-isolated, and the sharing succeeds.
-
-This means that, if you want to "un-isolate" your origin, you'll need to do so via a new, disconnected browsing context group, separate from the isolated one.
+As far as the web-developer–observable consequences of using origins for agent cluster keys, this will automatically cause `SharedArrayBuffer`s to no longer be shareable cross-origin, because of the agent cluster check in [StructuredDeserialize](https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserialize). We'd also need to add a check to the [`document.domain` setter](https://html.spec.whatwg.org/multipage/origin.html#dom-document-domain) to make it throw. (Ideally we'd find some way of restructuring the existing checks in `document.domain` so that they are also tied to agent cluster boundaries.)
 
 ## Design choices and alternatives considered
 
@@ -187,14 +154,14 @@ Origin policy is a natural fit for this feature, as isolation causes origin-wide
 
 ### The browsing context group scope of isolation
 
-The [more complicated example](#more-complicated-example) above explains how the current specification plan works in tricky scenarios involving origin policies changing between loads of documents from that origin. In short, origins get isolated per browsing context group.
+The [scenarios document](./scenarios.md) explains how the current specification plan works in tricky scenarios involving origin policies changing between loads of realms from that origin. In short, origins get isolated per browsing context group.
 
 We considered two other possible models:
 
-* Per-document: in this model, both `postMessage()`s would succeed, as even in the tab #1 browsing context group, we would put `https://b.example.com/2` and `https://c.example.com/` in the same agent cluster.
-* Per-user agent: in this model, both `postMessage()`s would fail, because the user agent keeps a global list of isolated origins, that does not get cleared until it restarts.
+* Per-realm: in this model, we would not check for the existence of other site-keyed realms within the browsing context group, and would always origin-isolate realms which request isolation, and never isolate ones that do not.
+* Per-user agent: in this model, we would keep a global list of all origins which have ever requested isolation, and consult this first whenever creating a new realm.
 
-The downside of the per-document model is that it leads to strange scenarios like `https://b.example.com/1` and `https://b.example.com/2` being in different agent clusters. That is, in the example above, the per-document model would put `https://b.example.com/1` in an agent clustered keyed by the `(https, b.example.com, 443)` origin, while it puts `https://b.example.com/2` in an agent cluster keyed by the `(https, example.com)` site. This is not desirable, as same-origin pages should not be isolated from each other by the origin isolation feature.
+The downside of the per-document model is that it leads to strange scenarios like `https://b.example.com/1` and `https://b.example.com/2` being in different agent clusters: one of them site-keyed, and the other origin-keyed. This is not desirable, as same-origin pages should not be isolated from each other by the origin isolation feature.
 
 The downside of the per-user agent model is that it makes it very hard for web application developers to roll back origin isolation. They essentially have to communicate to the user to restart their browser.
 
