@@ -153,11 +153,13 @@ As far as the web-developer–observable consequences of using origins for agent
 
 We mentioned above that origin isolation has no effect on workers. Here we explain why exactly that is.
 
-First note that shared and service workers are already isolated into their own agent clusters. The only other things that exist in those agent clusters are potential nested dedicated workers. Everything is already same-origin within those shared and service worker agent clusters.
+First note that shared and service workers are already isolated into their own agent clusters. The only other things that exist in those agent clusters are potential nested dedicated workers, which are already restricted to being same-origin.
 
 What remains to consider is dedicated workers which are spawned directly by documents. Those end up in the agent cluster of their owner document, and the allocation of that agent cluster is impacted by origin isolation, which makes it origin-keyed instead of site-keyed.
 
-However, being origin-keyed has no observable impact for code inside a dedicated worker. All access to other realms is asynchronous inside a dedicated worker, so `document.domain` does not apply. And there's no way for dedicated worker code to send a `SharedArrayBuffer` to a same-site cross-origin destination, because the only thing it can communicate with is its parent document, or further nested dedicated workers, all of which are same-origin. (Note that even `BroadcastChannel`, which bypasses the need to have a direct reference to the destination, is restricted to same-origin communications.)
+However, being origin-keyed has no observable impact for code inside a dedicated worker. All access to other realms is asynchronous inside a dedicated worker, so `document.domain` does not apply. And there's no way for dedicated worker code to send a `SharedArrayBuffer` to a same-site cross-origin destination directly, because the only thing it can communicate with is its parent document, or further nested dedicated workers, all of which are same-origin. Note that even `BroadcastChannel`, which bypasses the need to have a direct reference to the destination, is restricted to same-origin communications.
+
+A worker could send a `SharedArrayBuffer` to a same-site cross-origin destination by first passing it (or a `MessageChannel` through which the `SharedArrayBuffer` gets transmitted) to a same-origin document, and letting the document try to go beyond the origin boundary. This would no longer be possible with this proposal, but only because of the proposal's effect on the document, not because of any effect it had on the worker.
 
 (Note: this lack of impact is a bit hard to see with the current specification for how worker agents and agent clusters are allocated, which is declarative. [whatwg/html#5210](https://github.com/whatwg/html/issues/5210) tracks improving that specification; with such improvements, some of the above would become clearer.)
 
