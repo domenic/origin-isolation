@@ -147,7 +147,7 @@ Both of these are consequences of a desire to ensure that same-origin sites do n
 
 You can see a more full analysis of what results this algorithm produces in our [scenarios document](./scenarios.md).
 
-As far as the web-developer–observable consequences of using origins for agent cluster keys, this will automatically cause `SharedArrayBuffer`s to no longer be shareable cross-origin, because of the agent cluster check in [StructuredDeserialize](https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserialize). We'd also need to add a check to the [`document.domain` setter](https://html.spec.whatwg.org/multipage/origin.html#dom-document-domain) to make it no-op. (Ideally we'd find some way of restructuring the existing checks in `document.domain` so that they are also tied to agent cluster boundaries.)
+As far as the web-developer–observable consequences of using origins for agent cluster keys, this will automatically cause `SharedArrayBuffer`s to no longer be shareable cross-origin, because of the agent cluster check in [StructuredDeserialize](https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserialize). We'd also need to add a check to the [`document.domain` setter](https://html.spec.whatwg.org/multipage/origin.html#dom-document-domain) to make it no-op if the current agent's agent cluster is origin-keyed.
 
 ### More detail on workers
 
