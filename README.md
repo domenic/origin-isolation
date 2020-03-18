@@ -71,7 +71,7 @@ Origin-Isolation: ?1
 
 This indicates that the page wants isolation solely for increased encapsulation, i.e. for the direct effects of preventing `document.domain` usage and `SharedArrayBuffer` memory sharing.
 
-TODO: link to an issue bikeshedding this syntax.
+_[#18](https://github.com/WICG/origin-isolation/issues/18) is an issue for discussing the header value syntax._
 
 ## Objectives
 
