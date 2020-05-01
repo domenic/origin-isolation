@@ -50,11 +50,7 @@ The user then clicks a button in the main frame which inserts a second subframe,
 * Subframe 1: `https://e.org` (with `https://x.e.com` in the session history)
 * Subframe 2: `https://x.e.com` w/ OI
 
-The outcome for subframe 2 depends now on whether the `https://x.e.com` document in session history was retained in the back–forward cache. (I.e., whether the relevant session history entry contains a non-null `Document`.)
-
-If it was retained, then subframe 2 ends up keyed by `Site{https://e.com}`. This ensures that if the user navigates subframe 1 back, restoring the `Site{https://e.com}`-keyed instance of `https://x.e.com` in subframe 1, that subframe 1 and subframe 2 are still in the same `Site{https://e.com}` agent cluster, i.e. we have avoided isolating same-origin pages from each other.
-
-If it was not retained, then subframe 2 ends up keyed by `Origin{https://x.e.com}`, as there is nothing keyed by `Site{https://e.com}` in the agent cluster map. Then, if the user navigates subframe 2 back, since there is no back–forward cache document stored for `https://x.e.com`, a new one will be created. This new one will go through the process of choosing an agent cluster key, and also end up with `Origin{https://x.e.com}`. So again, we have ensured that subframe 1 and subframe 2 are both in the same agent cluster (this time the `Origin{https://x.e.com}` one), and have avoided isolating same-origin pages from each other. And even better, this time we were able to respect the origin isolation request, since there was nothing in the back–forward cache to prevent us.
+In this case, subframe 2 ends up keyed by `Site{https://e.com}`. This ensures that if the user navigates subframe 1 back, restoring the `Site{https://e.com}`-keyed instance of `https://x.e.com` in subframe 1, that subframe 1 and subframe 2 are still in the same `Site{https://e.com}` agent cluster, i.e. we have avoided isolating same-origin pages from each other.
 
 ### Inserting iframes and saving JS references
 
@@ -79,7 +75,7 @@ Some time later, JavaScript code inserts a new subframe, again pointing at `http
 
 Will the subframe get site-keyed, or origin-keyed?
 
-The answer is origin-keyed. The `window.savedFrame` variable does mean that the agent cluster map still contains an entry with key `Site{https://e.org}`, which itself contains the saved realm and corresponding `Window` object. However, because the iframe was removed from the DOM, the `Window` has  no browsing context, and thus no session history. This means there is no session history containing an `https://e.org`-origin `Document` within the agent cluster. Thus the request for origin isolation is respected, and we end up with `Origin{https://example.org/}` as the key.
+The answer is origin-keyed. The `window.savedFrame` variable does mean that the agent cluster map still contains an entry with key `Site{https://e.org}`, which itself contains the saved realm and corresponding `Window` object. However, because the iframe was removed from the DOM, the `Window` has no browsing context, and thus the browsing context group does not contain any browsing contexts that have seen the `https://e.org` origin. Thus the request for origin isolation is respected, and we end up with `Origin{https://example.org/}` as the key.
 
 
 ## Worked-out nested scenario

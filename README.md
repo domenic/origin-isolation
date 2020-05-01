@@ -116,28 +116,18 @@ In particular, when creating a document, we use the following in place of the cu
 1. If _key_ is an [origin](https://html.spec.whatwg.org/multipage/origin.html#concept-origin), then return _origin_.
 1. If _group_'s [agent cluster map](https://html.spec.whatwg.org/#agent-cluster-map)\[_origin_] exists, then return _origin_.
 1. If _requestsIsolation_ is true:
-    1. If _group_'s [agent cluster map](https://html.spec.whatwg.org/#agent-cluster-map)\[_site_] exists, and _group_'s [agent cluster map](https://html.spec.whatwg.org/#agent-cluster-map)\[_site_] has seen _origin_ before, then return _site_.
+    1. If _group_'s [agent cluster map](https://html.spec.whatwg.org/#agent-cluster-map)\[_site_] exists, and _group_ has seen _origin_ before, then return _site_.
     1. Return _origin_.
 1. Return _site_.
 
-A browsing context agent cluster _agentCluster_ **has seen an origin before**, given an origin _origin_, if the following algorithm returns true:
-
-1. Let _windowAgent_ be the single [similar-origin window agent](https://html.spec.whatwg.org/#similar-origin-window-agent) in _agentCluster_.
-1. For each [realm](https://tc39.es/ecma262/#sec-code-realms) _realm_ whose agent is _windowAgent_:
-    1. Let _window_ be _realm_'s [global object](https://html.spec.whatwg.org/#concept-realm-global).
-    1. Assert: _window_ is a `Window` object.
-    1. Let _browsingContext_ be _window_'s [browsing context](https://html.spec.whatwg.org/#window-bc).
-    1. If _browsingContext_ is null, then continue.
-    1. Let _sessionHistory_ be _browsingContext_'s [session history](https://html.spec.whatwg.org/#session-history).
-    1. If _sessionHistory_ contains an [entry](https://html.spec.whatwg.org/#session-history-entry) whose `Document` is non-null, and that `Document`'s [origin](https://dom.spec.whatwg.org/#concept-document-origin) is [same-origin](https://html.spec.whatwg.org/#same-origin) with _origin_, then return true.
-1. Return false.
+A browsing context group **has seen an origin before** if any of the browsing contexts in the group have at some point contained realms whose global object's associated `Document`'s origin matches the origin in question. (This will be formalized in the actual specification by tracking a list per BCG. Note that iframes that get removed from the document are no longer in the group, so do not contribute to this calculation.)
 
 This algorithm has two interesting features:
 
 * Even if origin isolation is not requested for a particular document creation, if origin isolation has previously created an origin-keyed agent cluster, then we put the new document in that origin-keyed agent cluster.
-* Even when origin isolation is requested, if there is a site-keyed agent cluster with same-origin documents in its session history, then we put the new document in that site-keyed agent cluster, ignoring the isolation request.
+* Even when origin isolation is requested, if there is a site-keyed agent cluster with same-origin documents in the browsing context group, then we put the new document in that site-keyed agent cluster, ignoring the isolation request.
 
-Both of these are consequences of a desire to ensure that same-origin sites do not end up isolated from each other, even in scenarios involving session history navigation and the back–forward cache.
+Both of these are consequences of a desire to ensure that same-origin sites do not end up isolated from each other, even in scenarios involving navigating through the session history.
 
 You can see a more full analysis of what results this algorithm produces in our [scenarios document](./scenarios.md).
 
