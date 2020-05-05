@@ -41,6 +41,7 @@ The previous scenarios illustrate some cases where the proposed algorithm ignore
 * Main frame: `https://e.com` w/ OI
 * Subframe: `https://x.e.com` w/o OI
 * Outcome (per above): Main in `Origin{https://e.com}` / Sub in `Site{https://e.com}`
+* Historical map of agent cluster keys for this browsing context group: `(https, e.com, 443) => Origin{https://e.com}`, `(https, x.e.com, 443) => Site{https://e.com}`
 
 The user clicks a link in the `https://x.e.com` subframe which takes them to `https://e.org`.
 
@@ -50,13 +51,16 @@ The user then clicks a button in the main frame which inserts a second subframe,
 * Subframe 1: `https://e.org` (with `https://x.e.com` in the session history)
 * Subframe 2: `https://x.e.com` w/ OI
 
-In this case, subframe 2 ends up keyed by `Site{https://e.com}`. This ensures that if the user navigates subframe 1 back, restoring the `Site{https://e.com}`-keyed instance of `https://x.e.com` in subframe 1, that subframe 1 and subframe 2 are still in the same `Site{https://e.com}` agent cluster, i.e. we have avoided isolating same-origin pages from each other.
+In this case, subframe 2 ends up keyed by `Site{https://e.com}`, because when loading `https://x.e.com`, we look up `(https, x.e.com, 443)` in the historical map of agent cluster keys, and see that it was originally allocated to `Site{https://e.com}`.
+
+This ensures that if the user navigates subframe 1 back, `https://x.e.com` again loads in `Site{https://e.com}`, as it did originally, and subframe 1 and subframe 2 are in the same `Site{https://e.com}` agent cluster. That is, we have avoided isolating same-origin pages from each other. And we've done so by using the rule of "first-seen agent cluster key wins", via the historical map of agent cluster keys.
 
 ### Inserting iframes and saving JS references
 
 * Main frame: `https://e.com` w/ OI
 * Subframe: `https://e.org` w/o OI
 * Outcome (per above): Main in `Origin{https://e.com}` / Sub in `Site{https://e.org}`.
+* Historical map of agent cluster keys for this browsing context group: `(https, e.com, 443) => Origin{https://e.com}`, `(https, e.org, 443) => Site{https://e.org}`
 
 JavaScript code in the main frame goes through a variety of contortions:
 
@@ -75,8 +79,7 @@ Some time later, JavaScript code inserts a new subframe, again pointing at `http
 
 Will the subframe get site-keyed, or origin-keyed?
 
-The answer is origin-keyed. The `window.savedFrame` variable does mean that the agent cluster map still contains an entry with key `Site{https://e.org}`, which itself contains the saved realm and corresponding `Window` object. However, because the iframe was removed from the DOM, the `Window` has no browsing context, and thus the browsing context group does not contain any browsing contexts that have seen the `https://e.org` origin. Thus the request for origin isolation is respected, and we end up with `Origin{https://example.org/}` as the key.
-
+The answer is site-keyed. We only consult the historical map of agent cluster keys, which says that `(https, e.org, 443)` goes in `Site{https://e.org}`. The fact that the iframe was removed (so no corresponding browsing context exists in the browsing context group), or that the `Window` was saved (so that the realm/agent/agent cluster still exist) do not impact our decision-making process here. We always consult the historical map of agent cluster keys to make the decision.
 
 ## Worked-out nested scenario
 
