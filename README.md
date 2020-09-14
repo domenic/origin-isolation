@@ -9,7 +9,7 @@ If a developer chooses to give up these capabilities, then the browser has more 
 
 Origin isolation only works in a [secure context](https://w3c.github.io/webappsec-secure-contexts/).
 
-This proposal has a corresponding [HTML Standard pull request](https://github.com/whatwg/html/pull/5545) currently under review.
+This proposal has a corresponding [HTML Standard pull request](https://github.com/whatwg/html/pull/5545) which is already merged into HTML Standard.
 
 _Note: this proposal does not fully "isolate" the origin in every sense of the word. It focuses on agent cluster allocation issue. See [below](#further-isolation) for potential future work on further isolation._
 
